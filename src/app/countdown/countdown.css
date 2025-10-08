@@ -1,0 +1,120 @@
+/* ==============================================================
+   Foggy Futuristic Minimalist Countdown
+   ============================================================== */
+
+/* --------------------------------------------------------------
+   1️⃣  Import a clean, modern font – “Inter” works great.
+   -------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+/* --------------------------------------------------------------
+   2️⃣  Global page reset – removes default margins.
+   -------------------------------------------------------------- */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;               /* no stray scrollbars */
+}
+
+/* --------------------------------------------------------------
+   3️⃣  Host (root component) – full‑screen, subtle gradient.
+   -------------------------------------------------------------- */
+:host {
+  position: fixed;
+  inset: 0;                       /* top/right/bottom/left = 0 */
+  display: block;
+  padding: 2rem;
+  box-sizing: border-box;
+
+  /* Very light gray‑blue gradient – feels “foggy”. */
+  background: linear-gradient(
+    150deg,
+    #f0f4f8 0%,
+    #d9e2ec 40%,
+    #bcccdc 70%,
+    #9fb3c8 100%
+  );
+}
+
+/* --------------------------------------------------------------
+   4️⃣  Fog overlay – a translucent white layer with a soft blur.
+   -------------------------------------------------------------- */
+:host::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);    /* creates the misty effect */
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------
+   5️⃣  Center the countdown container.
+   -------------------------------------------------------------- */
+.countdown {
+  position: relative;            /* needed for the overlay */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* --------------------------------------------------------------
+   6️⃣  Segment – a subtle card with a faint border.
+   -------------------------------------------------------------- */
+.segment {
+  text-align: center;
+  padding: 1rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    inset 0 0 4px rgba(255, 255, 255, 0.06);
+}
+
+/* --------------------------------------------------------------
+   7️⃣  Numbers – large, high‑contrast, slight blue glow.
+   -------------------------------------------------------------- */
+.value {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 4.2rem;               /* big enough to read easily */
+  color: #2c3e50;                  /* deep slate‑blue */
+  text-shadow:
+    0 0 4px rgba(44, 62, 80, 0.15),
+    0 0 8px rgba(44, 62, 80, 0.10);
+}
+
+/* --------------------------------------------------------------
+   8️⃣  Labels – smaller, lighter gray.
+   -------------------------------------------------------------- */
+.label {
+  margin-top: 0.35rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #5a6b7d;                  /* medium gray‑blue */
+}
+
+/* --------------------------------------------------------------
+   9️⃣  Subtle pulse animation for the numbers (optional).
+   -------------------------------------------------------------- */
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.92; transform: scale(1.03); }
+}
+.value {
+  animation: subtle-pulse 3s infinite ease-in-out;
+}
+
+/* --------------------------------------------------------------
+   🔟  Responsive tweaks – shrink on small screens.
+   -------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .value { font-size: 3rem; }
+  .label { font-size: 0.8rem; }
+  .segment { padding: 0.8rem 0.4rem; }
+}
