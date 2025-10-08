@@ -1,11 +1,18 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
+import { RouterModule } from '@angular/router';   // optional, only if you use routing
+import { CountdownComponent } from './countdown/countdown'; // <-- adjust path if needed
 
 @Component({
-  selector: 'app-root',
-  imports: [],
+  selector: 'my-app',
+  standalone: true,
+  imports: [
+    CountdownComponent,
+    RouterModule   // keep any other imports you already have
+  ],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrls: ['./app.css']
 })
-export class App {
-  protected readonly title = signal('countdown-app');
+export class AppComponent {
+  // Change this to whatever future date you need
+  upcoming = new Date('2025-10-17T23:00:00Z');
 }
