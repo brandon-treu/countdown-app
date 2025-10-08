@@ -1,19 +1,20 @@
 # .github/workflows/deploy.yml
 # Deploy an Angular SPA to GitHub Pages (static HTTPS)
-# Includes SPA fallback (404.html) and .nojekyll
+# Handles unknown project names, forces a known output folder,
+# adds SPA fallback (404.html) and .nojekyll.
 
 name: Deploy Angular App to GitHub Pages
 
 on:
   push:
-    branches: [ "main" ]      # adjust if your default branch has a different name
-  workflow_dispatch:          # allow manual runs from the Actions UI
+    branches: [ "main" ]      # change if your default branch has a different name
+  workflow_dispatch:          # allow manual runs
 
 # -------------------------------------------------
 # Permissions – needed for the deploy action to push
 # -------------------------------------------------
 permissions:
-  contents: write   # allows the action to create/overwrite the gh‑pages branch
+  contents: write   # lets the action create/overwrite gh‑pages
   pages: write
   id-token: write
 
@@ -32,65 +33,84 @@ jobs:
         uses: actions/checkout@v3
 
       # -------------------------------------------------
-      # 2️⃣ Set up Node.js (use a version compatible with Angular CLI)
+      # 2️⃣ Set up Node.js (Angular CLI needs ≥ 20)
       # -------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20"   # Angular CLI needs ≥ 20.19
+          node-version: "20"   # Angular CLI minimum version
           cache: "npm"
 
       # -------------------------------------------------
-      # 3️⃣ Install dependencies (including @angular/cli)
+      # 3️⃣ Install npm dependencies (includes @angular/cli)
       # -------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
       # -------------------------------------------------
-      # 4️⃣ Build Angular with the correct base‑href
+      # 4️⃣ Determine the Angular project name
+      # -------------------------------------------------
+      - name: Get Angular project name
+        id: proj
+        run: |
+          # The default project is stored under "defaultProject" in angular.json
+          DEFAULT=$(jq -r '.defaultProject // empty' angular.json || echo "")
+          if [[ -n "$DEFAULT" ]]; then
+            echo "Found defaultProject: $DEFAULT"
+            echo "project=$DEFAULT" >> $GITHUB_OUTPUT
+          else
+            # Fall back: pick the first project key under "projects"
+            FIRST=$(jq -r '.projects | keys[0]' angular.json)
+            echo "Using first project key: $FIRST"
+            echo "project=$FIRST" >> $GITHUB_OUTPUT
+          fi
+
+      # -------------------------------------------------
+      # 5️⃣ Build Angular – force a known output folder
       # -------------------------------------------------
       - name: Build Angular app
         env:
           REPO_NAME: ${{ github.event.repository.name }}
+          PROJECT: ${{ steps.proj.outputs.project }}
         run: |
-          echo "🔧 Building for repo: $REPO_NAME"
-          # The base‑href must match the sub‑path GitHub Pages will serve from
-          npx ng build --configuration production --base-href "/${REPO_NAME}/"
+          echo "🔧 Building project '$PROJECT' for repo: $REPO_NAME"
+          # Force the output folder to ./dist/out so we always know where it lands
+          npx ng build "$PROJECT" \
+            --configuration production \
+            --output-path=dist/out \
+            --base-href="/${REPO_NAME}/"
 
       # -------------------------------------------------
-      # 5️⃣ Detect the folder Angular actually created under ./dist/
+      # 6️⃣ Debug – list what the build produced
       # -------------------------------------------------
-      - name: Detect build folder
-        id: detect
+      - name: List build output
         run: |
-          BUILD_DIR=$(find ./dist -mindepth 1 -maxdepth 1 -type d | head -n1)
-          if [[ -z "$BUILD_DIR" ]]; then
-            echo "❌ No folder found under ./dist after build."
-            ls -R ./dist   # dump for debugging
-            exit 1
-          fi
-          echo "✅ Build folder detected: $BUILD_DIR"
-          echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+          echo "=== CONTENTS OF ./dist/out ==="
+          ls -R ./dist/out
+          echo "=== END OF LIST ==="
 
       # -------------------------------------------------
-      # 6️⃣ Add SPA fallback (index.html → 404.html) & .nojekyll
+      # 7️⃣ Add SPA fallback (index.html → 404.html) & .nojekyll
       # -------------------------------------------------
       - name: Add SPA fallback & .nojekyll
-        env:
-          BUILD_DIR: ${{ steps.detect.outputs.build_dir }}
         run: |
-          echo "📁 Working in $BUILD_DIR"
+          BUILD_DIR=./dist/out
+          if [[ ! -f "${BUILD_DIR}/index.html" ]]; then
+            echo "❌ index.html not found in ${BUILD_DIR} – aborting."
+            exit 1
+          fi
           cp "${BUILD_DIR}/index.html" "${BUILD_DIR}/404.html"
           touch "${BUILD_DIR}/.nojekyll"
+          echo "✅ Created 404.html and .nojekyll in ${BUILD_DIR}"
 
       # -------------------------------------------------
-      # 7️⃣ Deploy to GitHub Pages (creates/updates gh‑pages)
+      # 8️⃣ Deploy to GitHub Pages (creates/updates gh‑pages)
       # -------------------------------------------------
       - name: Deploy to GitHub Pages
         id: deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages                # target branch
-          folder: ${{ steps.detect.outputs.build_dir }}   # the folder we just built
-          clean: true                     # wipe old files on gh‑pages before copy
-          token: ${{ secrets.GITHUB_TOKEN }}
+          folder: ./dist/out               # the folder we just prepared
+          clean: true                     # wipe old files before copy
+          token: ${
