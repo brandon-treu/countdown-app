@@ -1,0 +1,60 @@
+# .github/workflows/deploy.yml
+# Deploy Angular App to GitHub Pages
+
+name: Deploy Angular App to GitHub Pages
+
+# -------------------------------------------------
+# When to run the workflow
+# -------------------------------------------------
+on:
+  push:
+    branches:
+      - main          # runs on pushes to the default branch (adjust if needed)
+
+# -------------------------------------------------
+# Jobs definition
+# -------------------------------------------------
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------
+      # 1️⃣ Checkout the repository
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # -------------------------------------------------
+      # 2️⃣ Set up Node.js (using the LTS version you prefer)
+      # -------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'   # or any other version you use locally
+
+      # -------------------------------------------------
+      # 3️⃣ Install npm dependencies (clean install)
+      # -------------------------------------------------
+      - name: Install dependencies
+        run: npm ci
+
+      # -------------------------------------------------
+      # 4️⃣ Build the Angular app for production
+      # -------------------------------------------------
+      - name: Build Angular app
+        run: |
+          npm run build -- \
+            --configuration production \
+            --base-href /countdown-app/   # <-- adjust if your repo name differs
+
+      # -------------------------------------------------
+      # 5️⃣ Deploy the built files to the gh‑pages branch
+      # -------------------------------------------------
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages                 # target branch on which Pages is served
+          folder: dist/countdown-app        # folder produced by the Angular build
+          clean: true                      # removes old files from gh‑pages before copy
+          token: ${{ secrets.GITHUB_TOKEN }}   # default token, no extra secret needed
