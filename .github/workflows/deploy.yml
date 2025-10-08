@@ -1,22 +1,28 @@
 # .github/workflows/deploy.yml
-# Deploy Angular App to GitHub Pages
+# Deploy an Angular SPA to GitHub Pages (static HTTPS)
+# Includes SPA fallback (404.html) and .nojekyll
 
 name: Deploy Angular App to GitHub Pages
 
-# -------------------------------------------------
-# When to run the workflow
-# -------------------------------------------------
 on:
   push:
-    branches:
-      - main          # runs on pushes to the default branch (adjust if needed)
+    branches: [ "main" ]      # adjust if your default branch has a different name
+  workflow_dispatch:          # allow manual runs from the Actions UI
 
 # -------------------------------------------------
-# Jobs definition
+# Permissions – needed for the deploy action to push
 # -------------------------------------------------
+permissions:
+  contents: write   # allows the action to create/overwrite the gh‑pages branch
+  pages: write
+  id-token: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       # -------------------------------------------------
@@ -26,35 +32,65 @@ jobs:
         uses: actions/checkout@v3
 
       # -------------------------------------------------
-      # 2️⃣ Set up Node.js (using the LTS version you prefer)
+      # 2️⃣ Set up Node.js (LTS) and cache npm modules
       # -------------------------------------------------
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'   # or any other version you use locally
+          node-version: "18"
+          cache: "npm"
 
       # -------------------------------------------------
-      # 3️⃣ Install npm dependencies (clean install)
+      # 3️⃣ Install dependencies (including @angular/cli)
       # -------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
       # -------------------------------------------------
-      # 4️⃣ Build the Angular app for production
+      # 4️⃣ Build Angular with the correct base‑href
       # -------------------------------------------------
       - name: Build Angular app
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          npm run build -- \
-            --configuration production \
-            --base-href /countdown-app/   # <-- adjust if your repo name differs
+          echo "🔧 Building for repo: $REPO_NAME"
+          # The base‑href must match the sub‑path GitHub Pages will serve from
+          npx ng build --configuration production --base-href "/${REPO_NAME}/"
 
       # -------------------------------------------------
-      # 5️⃣ Deploy the built files to the gh‑pages branch
+      # 5️⃣ Detect the folder Angular actually created under ./dist/
+      # -------------------------------------------------
+      - name: Detect build folder
+        id: detect
+        run: |
+          BUILD_DIR=$(find ./dist -mindepth 1 -maxdepth 1 -type d | head -n1)
+          if [[ -z "$BUILD_DIR" ]]; then
+            echo "❌ No folder found under ./dist after build."
+            ls -R ./dist   # dump for debugging
+            exit 1
+          fi
+          echo "✅ Build folder detected: $BUILD_DIR"
+          echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+
+      # -------------------------------------------------
+      # 6️⃣ Add SPA fallback (index.html → 404.html) & .nojekyll
+      # -------------------------------------------------
+      - name: Add SPA fallback & .nojekyll
+        env:
+          BUILD_DIR: ${{ steps.detect.outputs.build_dir }}
+        run: |
+          echo "📁 Working in $BUILD_DIR"
+          cp "${BUILD_DIR}/index.html" "${BUILD_DIR}/404.html"
+          touch "${BUILD_DIR}/.nojekyll"
+
+      # -------------------------------------------------
+      # 7️⃣ Deploy to GitHub Pages (creates/updates gh‑pages)
       # -------------------------------------------------
       - name: Deploy to GitHub Pages
+        id: deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages                 # target branch on which Pages is served
-          folder: dist/countdown-app        # folder produced by the Angular build
-          clean: true                      # removes old files from gh‑pages before copy
-          token: ${{ secrets.GITHUB_TOKEN }}   # default token, no extra secret needed
+          branch: gh-pages                # target branch
+          folder: ${{ steps.detect.outputs.build_dir }}   # the folder we just built
+          clean: true                     # wipe old files on gh‑pages before copy
+          token: ${{ secrets.GITHUB_TOKEN }}
